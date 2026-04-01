@@ -11,6 +11,11 @@
     --hover-color: #ecf0f1;
   }
 
+  /* 確保所有元素的寬度包含 padding 與 border */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f8f9fa;
@@ -22,6 +27,11 @@
     margin: 0;
   }
 
+  header {
+    text-align: center;
+    width: 100%;
+  }
+
   h1 { margin-bottom: 10px; }
 
   /* 題目區域：視圖佈局 */
@@ -29,16 +39,24 @@
     display: flex;
     gap: 40px;
     margin-bottom: 30px;
-    padding: 20px;
+    padding: 20px 40px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    justify-content: center;
+    width: 100%;
+    max-width: 600px;
   }
 
   .view-box {
     display: flex;
     flex-direction: column;
     align-items: center;
+  }
+
+  .view-box span {
+    margin-bottom: 8px;
+    font-weight: bold;
   }
 
   /* 2D 網格繪製 */
@@ -80,6 +98,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* 確保卡片內部元素不會超出邊界 */
+    overflow: hidden; 
   }
 
   .option-card:hover {
@@ -96,6 +116,8 @@
   canvas {
     width: 200px;
     height: 200px;
+    /* 讓 canvas 在小螢幕時能等比例縮小，不會破版 */
+    max-width: 100%; 
   }
 
   /* 控制與回饋區 */
@@ -105,17 +127,20 @@
     flex-direction: column;
     align-items: center;
     gap: 15px;
+    width: 100%;
   }
 
   button {
-    padding: 10px 20px;
-    font-size: 1rem;
+    padding: 12px 24px; /* 稍微放大按鈕，讓手機更好點擊 */
+    font-size: 1.1rem;
     cursor: pointer;
     background-color: #3498db;
     color: white;
     border: none;
     border-radius: 4px;
     transition: background-color 0.2s;
+    width: 100%;
+    max-width: 300px;
   }
 
   button:hover { background-color: #2980b9; }
@@ -124,10 +149,38 @@
     font-size: 1.2rem;
     font-weight: bold;
     height: 24px;
+    text-align: center;
   }
 
   .correct { color: #27ae60; }
   .wrong { color: #e74c3c; }
+
+  /* =========================================
+     手機版響應式設計 (RWD) 
+     當螢幕寬度小於 600px 時觸發
+     ========================================= */
+  @media (max-width: 600px) {
+    body {
+      padding: 10px;
+    }
+
+    /* 將題目視圖改為上下排列，減少左右擁擠感 */
+    .question-container {
+      flex-direction: column;
+      gap: 25px;
+      padding: 15px;
+    }
+
+    /* 將選項改為單行排列，讓點擊範圍足夠大 */
+    .options-container {
+      grid-template-columns: 1fr;
+      gap: 15px;
+    }
+
+    button {
+      padding: 15px 20px; /* 手機版按鈕加高，符合觸控熱區規範 */
+    }
+  }
 </style>
 </head>
 <body>
@@ -137,7 +190,7 @@
     <p>根據下方的「俯視圖」與「右側視圖」，選出正確的 3D 立體圖形。</p>
   </header>
 
-  <main>
+  <main style="width: 100%; display: flex; flex-direction: column; align-items: center;">
     <section class="question-container">
       <div class="view-box">
         <span>俯視圖</span>
@@ -273,7 +326,7 @@
     const dx = cubeSize * Math.cos(Math.PI / 6);
     const dy = cubeSize * Math.sin(Math.PI / 6);
     
-    // 設定畫布原點 (將 +50 改為 +20 以提高圖形位置)
+    // 設定畫布原點
     const originX = width / 2;
     const originY = height / 2 + 2; 
 
