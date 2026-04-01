@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 空間邏輯無限刷題系統</title>
+<style>
+  :root {
+    --primary-color: #2c3e50;
+    --border-color: #bdc3c7;
+    --hover-color: #ecf0f1;
+  }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: var(--primary-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    margin: 0;
+  }
+
+  h1 { margin-bottom: 10px; }
+
+  /* 題目區域：視圖佈局 */
+  .question-container {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+
+  .view-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* 2D 網格繪製 */
+  .grid-2d {
+    display: grid;
+    grid-template-columns: repeat(3, 30px);
+    grid-template-rows: repeat(3, 30px);
+    gap: 2px;
+    background-color: var(--border-color);
+    border: 2px solid var(--border-color);
+  }
+
+  .grid-cell {
+    width: 30px;
+    height: 30px;
+    background-color: white;
+  }
+
+  .grid-cell.filled {
+    background-color: var(--primary-color);
+  }
+
+  /* 選項區域 */
+  .options-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+  }
+
+  .option-card {
+    background: white;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .option-card:hover {
+    background-color: var(--hover-color);
+    border-color: #3498db;
+  }
+
+  .option-label {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  canvas {
+    width: 200px;
+    height: 200px;
+  }
+
+  /* 控制與回饋區 */
+  .controls {
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+
+  button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  button:hover { background-color: #2980b9; }
+
+  #feedback {
+    font-size: 1.2rem;
+    font-weight: bold;
+    height: 24px;
+  }
+
+  .correct { color: #27ae60; }
+  .wrong { color: #e74c3c; }
+</style>
+</head>
+<body>
+
+  <header>
+    <h1>空間關係測驗</h1>
+    <p>根據下方的「俯視圖」與「右側視圖」，選出正確的 3D 立體圖形。</p>
+  </header>
+
+  <main>
+    <section class="question-container">
+      <div class="view-box">
+        <span>俯視圖</span>
+        <div id="topViewGrid" class="grid-2d"></div>
+      </div>
+      <div class="view-box">
+        <span>右側視圖</span>
+        <div id="rightViewGrid" class="grid-2d"></div>
+      </div>
+    </section>
+
+    <section class="options-container" id="optionsContainer">
+      </section>
+  </main>
+
+  <footer class="controls">
+    <div id="feedback"></div>
+    <button id="nextBtn" onclick="initGame()">產生下一題</button>
+  </footer>
+
+<script>
+  /**
+   * 3D 陣列資料結構說明：
+   * 使用 3x3 的二維陣列代表底層 x, z 座標，陣列中的值代表該位置的 y (高度)。
+   * 例如形狀 [ [1,0,0], [0,2,0], [1,1,1] ] 代表網格上的高度分佈。
+   */
+
+  const GRID_SIZE = 3;
+  const MAX_HEIGHT = 3;
+  let currentCorrectAnswerIndex = -1;
+
+  // --- 1. 核心邏輯：生成與分析圖形 ---
+
+  /** 隨機生成一個符合規範的 3D 形狀 */
+  const generateRandomShape = () => {
+    const shape = [];
+    let hasBlocks = false;
+    
+    for (let z = 0; z < GRID_SIZE; z++) {
+      const row = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        // 隨機高度 0~MAX_HEIGHT，稍微增加 0 的機率讓圖形不那麼擁擠
+        const height = Math.random() > 0.3 ? Math.floor(Math.random() * (MAX_HEIGHT + 1)) : 0;
+        row.push(height);
+        if (height > 0) hasBlocks = true;
+      }
+      shape.push(row);
+    }
+    
+    // 避免產生全空的題目，若全空則重新生成 (換一種方法試試看)
+    return hasBlocks ? shape : generateRandomShape();
+  };
+
+  /** 解析俯視圖：有高度的地方就是有方塊 */
+  const getTopView = (shape) => {
+    const view = [];
+    for (let z = 0; z < GRID_SIZE; z++) {
+      const row = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        row.push(shape[z][x] > 0 ? 1 : 0);
+      }
+      view.push(row);
+    }
+    return view;
+  };
+
+  /** * 解析右側視圖：從右邊看過去，只會看到每一列 (z 軸) 中最高的那個方塊 
+   * 注意投影面是 Y-Z 平面
+   */
+  const getRightView = (shape) => {
+    const view = Array(MAX_HEIGHT).fill(0).map(() => Array(GRID_SIZE).fill(0));
+    
+    for (let z = 0; z < GRID_SIZE; z++) {
+      let maxHeightInRow = 0;
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (shape[z][x] > maxHeightInRow) {
+          maxHeightInRow = shape[z][x];
+        }
+      }
+      // 將高度轉換為 2D 網格表示 (由下往上填滿)
+      for (let y = 0; y < maxHeightInRow; y++) {
+        // 陣列索引 0 是最上面，所以要做反轉：(MAX_HEIGHT - 1) - y
+        view[(MAX_HEIGHT - 1) - y][z] = 1; 
+      }
+    }
+    return view;
+  };
+
+  // --- 2. 視圖渲染 (DOM 操作) ---
+
+  /** 渲染 2D 視圖網格 */
+  const render2DGrid = (elementId, viewMatrix) => {
+    const container = document.getElementById(elementId);
+    if (!container) return; // Null check
+    
+    container.innerHTML = '';
+    
+    // 根據矩陣維度動態調整 CSS Grid
+    const rows = viewMatrix.length;
+    const cols = viewMatrix[0].length;
+    container.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+    container.style.gridTemplateRows = `repeat(${rows}, 30px)`;
+
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell' + (viewMatrix[i][j] ? ' filled' : '');
+        container.appendChild(cell);
+      }
+    }
+  };
+
+  // --- 3. Isometric (等角投影) Canvas 實心實體繪製核心 ---
+
+  /** * 在 Canvas 上畫出等角投影的 3D 實心方塊群
+   * 採用嚴格的巢狀迴圈重繪策略（Painter's Algorithm on Grid level）
+   * 順序：由下而上(y) -> 由後而前(對角線方向 x+z) -> 由左而右(x)
+   */
+  const renderIsometricShape = (canvasElement, shape) => {
+    if (!canvasElement) return; // Null check
+    
+    const ctx = canvasElement.getContext('2d');
+    if (!ctx) return; // Null check
+
+    const width = canvasElement.width;
+    const height = canvasElement.height;
+    
+    // 清空畫布
+    ctx.clearRect(0, 0, width, height);
+    
+    const cubeSize = 22; // 單個方塊邊長
+    // 等角投影角度常數
+    const dx = cubeSize * Math.cos(Math.PI / 6);
+    const dy = cubeSize * Math.sin(Math.PI / 6);
+    
+    // 設定畫布原點 (將 +50 改為 +20 以提高圖形位置)
+    const originX = width / 2;
+    const originY = height / 2 + 2; 
+
+    // 繪製單個實心方塊的輔助函數
+    const drawSolidCube = (x, y, z) => {
+      // 計算該網格座標在 2D 螢幕上的像素原點
+      const screenX = originX + (x - z) * dx;
+      const screenY = originY - (y * cubeSize) + (x + z) * dy;
+      
+      // 繪製左側面 (Left Face)
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY);
+      ctx.lineTo(screenX - dx, screenY - dy);
+      ctx.lineTo(screenX - dx, screenY - dy + cubeSize);
+      ctx.lineTo(screenX, screenY + cubeSize);
+      ctx.closePath();
+      ctx.fillStyle = '#7f8c8d'; 
+      ctx.fill();
+
+      // 繪製右側面 (Right Face)
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY);
+      ctx.lineTo(screenX + dx, screenY - dy);
+      ctx.lineTo(screenX + dx, screenY - dy + cubeSize);
+      ctx.lineTo(screenX, screenY + cubeSize);
+      ctx.closePath();
+      ctx.fillStyle = '#bdc3c7'; 
+      ctx.fill();
+
+      // 繪製頂面 (Top Face)
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY);
+      ctx.lineTo(screenX + dx, screenY - dy);
+      ctx.lineTo(screenX, screenY - 2 * dy);
+      ctx.lineTo(screenX - dx, screenY - dy);
+      ctx.closePath();
+      ctx.fillStyle = '#fbfcfc'; 
+      ctx.fill();
+
+      // 繪製邊線
+      ctx.strokeStyle = '#95a5a6';
+      ctx.lineWidth = 0.8;
+      ctx.stroke(); 
+    };
+
+    // 實體化重繪核心：嚴格遵守遮擋順序
+    // 1. 分層繪製 (y方向)
+    for (let y = 0; y < MAX_HEIGHT; y++) {
+      // 2. 實體對角線排序 (x+z方向)：值越小越在後面
+      for (let depthSum = 0; depthSum <= 2 * (GRID_SIZE - 1); depthSum++) {
+        // 3. 尋找符合目前 depthSum 的座標點
+        for (let x = 0; x < GRID_SIZE; x++) {
+          const z = depthSum - x;
+          
+          // 確保 z 在合法範圍內且該位置高度大於目前層數
+          if (z >= 0 && z < GRID_SIZE && shape[z][x] > y) {
+            drawSolidCube(x, y, z);
+          }
+        }
+      }
+    }
+  };
+
+  // --- 4. 遊戲主邏輯 ---
+
+  const handleOptionClick = (selectedIndex) => {
+    const feedbackEl = document.getElementById('feedback');
+    if (!feedbackEl) return; // Null check
+
+    if (selectedIndex === currentCorrectAnswerIndex) {
+      feedbackEl.textContent = '✅ 答對了！非常棒！';
+      feedbackEl.className = 'correct';
+    } else {
+      feedbackEl.textContent = '❌ 答錯了，再仔細觀察一下視圖喔！';
+      feedbackEl.className = 'wrong';
+    }
+  };
+
+  const initGame = () => {
+    const feedbackEl = document.getElementById('feedback');
+    if (feedbackEl) {
+      feedbackEl.textContent = '';
+      feedbackEl.className = '';
+    }
+
+    // 1. 生成正確答案
+    const correctShape = generateRandomShape();
+    
+    // 2. 繪製題目視圖
+    render2DGrid('topViewGrid', getTopView(correctShape));
+    render2DGrid('rightViewGrid', getRightView(correctShape));
+
+    // 3. 準備選項陣列 (1 個正確，3 個干擾)
+    const options = [correctShape];
+    while (options.length < 4) {
+      const distractor = generateRandomShape();
+      // 簡單的查重：將陣列轉字串比較，確保不會有完全一樣的選項
+      if (JSON.stringify(distractor) !== JSON.stringify(correctShape)) {
+        options.push(distractor);
+      }
+    }
+
+    // 4. 打亂選項順序 (Fisher-Yates Shuffle)
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+
+    // 記錄正確答案的新索引
+    currentCorrectAnswerIndex = options.findIndex(
+      opt => JSON.stringify(opt) === JSON.stringify(correctShape)
+    );
+
+    // 5. 渲染選項與 Canvas
+    const optionsContainer = document.getElementById('optionsContainer');
+    if (!optionsContainer) return; // Null check
+    
+    optionsContainer.innerHTML = '';
+    const labels = ['(A)', '(B)', '(C)', '(D)'];
+
+    options.forEach((shape, index) => {
+      const card = document.createElement('div');
+      card.className = 'option-card';
+      card.onclick = () => handleOptionClick(index);
+
+      const label = document.createElement('div');
+      label.className = 'option-label';
+      label.textContent = labels[index];
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 200;
+      canvas.height = 200;
+
+      card.appendChild(label);
+      card.appendChild(canvas);
+      optionsContainer.appendChild(card);
+
+      // 畫出 3D 形狀
+      renderIsometricShape(canvas, shape);
+    });
+  };
+
+  // 初始化第一關
+  window.onload = initGame;
+
+</script>
+</body>
+</html>
