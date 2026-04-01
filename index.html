@@ -131,7 +131,7 @@
   }
 
   button {
-    padding: 12px 24px; /* 稍微放大按鈕，讓手機更好點擊 */
+    padding: 12px 24px;
     font-size: 1.1rem;
     cursor: pointer;
     background-color: #3498db;
@@ -164,21 +164,19 @@
       padding: 10px;
     }
 
-    /* 將題目視圖改為上下排列，減少左右擁擠感 */
     .question-container {
       flex-direction: column;
       gap: 25px;
       padding: 15px;
     }
 
-    /* 將選項改為單行排列，讓點擊範圍足夠大 */
     .options-container {
       grid-template-columns: 1fr;
       gap: 15px;
     }
 
     button {
-      padding: 15px 20px; /* 手機版按鈕加高，符合觸控熱區規範 */
+      padding: 15px 20px;
     }
   }
 </style>
@@ -212,19 +210,12 @@
   </footer>
 
 <script>
-  /**
-   * 3D 陣列資料結構說明：
-   * 使用 3x3 的二維陣列代表底層 x, z 座標，陣列中的值代表該位置的 y (高度)。
-   * 例如形狀 [ [1,0,0], [0,2,0], [1,1,1] ] 代表網格上的高度分佈。
-   */
-
   const GRID_SIZE = 3;
   const MAX_HEIGHT = 3;
   let currentCorrectAnswerIndex = -1;
 
   // --- 1. 核心邏輯：生成與分析圖形 ---
 
-  /** 隨機生成一個符合規範的 3D 形狀 */
   const generateRandomShape = () => {
     const shape = [];
     let hasBlocks = false;
@@ -232,7 +223,6 @@
     for (let z = 0; z < GRID_SIZE; z++) {
       const row = [];
       for (let x = 0; x < GRID_SIZE; x++) {
-        // 隨機高度 0~MAX_HEIGHT，稍微增加 0 的機率讓圖形不那麼擁擠
         const height = Math.random() > 0.3 ? Math.floor(Math.random() * (MAX_HEIGHT + 1)) : 0;
         row.push(height);
         if (height > 0) hasBlocks = true;
@@ -240,11 +230,9 @@
       shape.push(row);
     }
     
-    // 避免產生全空的題目，若全空則重新生成 (換一種方法試試看)
     return hasBlocks ? shape : generateRandomShape();
   };
 
-  /** 解析俯視圖：有高度的地方就是有方塊 */
   const getTopView = (shape) => {
     const view = [];
     for (let z = 0; z < GRID_SIZE; z++) {
@@ -257,9 +245,6 @@
     return view;
   };
 
-  /** * 解析右側視圖：從右邊看過去，只會看到每一列 (z 軸) 中最高的那個方塊 
-   * 注意投影面是 Y-Z 平面
-   */
   const getRightView = (shape) => {
     const view = Array(MAX_HEIGHT).fill(0).map(() => Array(GRID_SIZE).fill(0));
     
@@ -270,9 +255,7 @@
           maxHeightInRow = shape[z][x];
         }
       }
-      // 將高度轉換為 2D 網格表示 (由下往上填滿)
       for (let y = 0; y < maxHeightInRow; y++) {
-        // 陣列索引 0 是最上面，所以要做反轉：(MAX_HEIGHT - 1) - y
         view[(MAX_HEIGHT - 1) - y][z] = 1; 
       }
     }
@@ -281,14 +264,12 @@
 
   // --- 2. 視圖渲染 (DOM 操作) ---
 
-  /** 渲染 2D 視圖網格 */
   const render2DGrid = (elementId, viewMatrix) => {
     const container = document.getElementById(elementId);
-    if (!container) return; // Null check
+    if (!container) return;
     
     container.innerHTML = '';
     
-    // 根據矩陣維度動態調整 CSS Grid
     const rows = viewMatrix.length;
     const cols = viewMatrix[0].length;
     container.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
@@ -305,38 +286,71 @@
 
   // --- 3. Isometric (等角投影) Canvas 實心實體繪製核心 ---
 
-  /** * 在 Canvas 上畫出等角投影的 3D 實心方塊群
-   * 採用嚴格的巢狀迴圈重繪策略（Painter's Algorithm on Grid level）
-   * 順序：由下而上(y) -> 由後而前(對角線方向 x+z) -> 由左而右(x)
-   */
   const renderIsometricShape = (canvasElement, shape) => {
-    if (!canvasElement) return; // Null check
+    if (!canvasElement) return;
     
     const ctx = canvasElement.getContext('2d');
-    if (!ctx) return; // Null check
+    if (!ctx) return;
 
     const width = canvasElement.width;
     const height = canvasElement.height;
     
-    // 清空畫布
     ctx.clearRect(0, 0, width, height);
     
-    const cubeSize = 22; // 單個方塊邊長
-    // 等角投影角度常數
+    const cubeSize = 22; 
     const dx = cubeSize * Math.cos(Math.PI / 6);
     const dy = cubeSize * Math.sin(Math.PI / 6);
     
-    // 設定畫布原點
     const originX = width / 2;
     const originY = height / 2 + 2; 
 
-    // 繪製單個實心方塊的輔助函數
+    // ==========================================
+    // 新增：繪製底層九宮格虛線
+    // ==========================================
+    ctx.save();
+    ctx.setLineDash([4, 4]); // 設定為虛線 (長度4, 間距4)
+    ctx.strokeStyle = '#bdc3c7'; // 虛線顏色使用淺灰色
+    ctx.lineWidth = 1;
+
+    /**
+     * 輔助函數：計算 3D 空間中 (x, z) 座標落在 2D 畫布上的點
+     * 這個公式對應於方塊(y=0)時，貼齊地面的最深處(後角)頂點
+     */
+    const getFloorPoint = (gridX, gridZ) => {
+      return {
+        px: originX + (gridX - gridZ) * dx,
+        // - 2 * dy 是為了推算到正方形背後的頂點，+ cubeSize 是降到底部高度
+        py: originY + (gridX + gridZ - 2) * dy + cubeSize 
+      };
+    };
+
+    // 畫 4 條平行的 Z 軸方向底線
+    for (let x = 0; x <= GRID_SIZE; x++) {
+      ctx.beginPath();
+      const start = getFloorPoint(x, 0);
+      const end = getFloorPoint(x, GRID_SIZE);
+      ctx.moveTo(start.px, start.py);
+      ctx.lineTo(end.px, end.py);
+      ctx.stroke();
+    }
+
+    // 畫 4 條平行的 X 軸方向底線
+    for (let z = 0; z <= GRID_SIZE; z++) {
+      ctx.beginPath();
+      const start = getFloorPoint(0, z);
+      const end = getFloorPoint(GRID_SIZE, z);
+      ctx.moveTo(start.px, start.py);
+      ctx.lineTo(end.px, end.py);
+      ctx.stroke();
+    }
+    ctx.restore(); // 恢復畫筆狀態，確保後續的方塊框線不會變成虛線
+    // ==========================================
+
     const drawSolidCube = (x, y, z) => {
-      // 計算該網格座標在 2D 螢幕上的像素原點
       const screenX = originX + (x - z) * dx;
       const screenY = originY - (y * cubeSize) + (x + z) * dy;
       
-      // 繪製左側面 (Left Face)
+      // Left Face
       ctx.beginPath();
       ctx.moveTo(screenX, screenY);
       ctx.lineTo(screenX - dx, screenY - dy);
@@ -346,7 +360,7 @@
       ctx.fillStyle = '#7f8c8d'; 
       ctx.fill();
 
-      // 繪製右側面 (Right Face)
+      // Right Face
       ctx.beginPath();
       ctx.moveTo(screenX, screenY);
       ctx.lineTo(screenX + dx, screenY - dy);
@@ -356,7 +370,7 @@
       ctx.fillStyle = '#bdc3c7'; 
       ctx.fill();
 
-      // 繪製頂面 (Top Face)
+      // Top Face
       ctx.beginPath();
       ctx.moveTo(screenX, screenY);
       ctx.lineTo(screenX + dx, screenY - dy);
@@ -366,22 +380,16 @@
       ctx.fillStyle = '#fbfcfc'; 
       ctx.fill();
 
-      // 繪製邊線
+      // Edges
       ctx.strokeStyle = '#95a5a6';
       ctx.lineWidth = 0.8;
       ctx.stroke(); 
     };
 
-    // 實體化重繪核心：嚴格遵守遮擋順序
-    // 1. 分層繪製 (y方向)
     for (let y = 0; y < MAX_HEIGHT; y++) {
-      // 2. 實體對角線排序 (x+z方向)：值越小越在後面
       for (let depthSum = 0; depthSum <= 2 * (GRID_SIZE - 1); depthSum++) {
-        // 3. 尋找符合目前 depthSum 的座標點
         for (let x = 0; x < GRID_SIZE; x++) {
           const z = depthSum - x;
-          
-          // 確保 z 在合法範圍內且該位置高度大於目前層數
           if (z >= 0 && z < GRID_SIZE && shape[z][x] > y) {
             drawSolidCube(x, y, z);
           }
@@ -394,7 +402,7 @@
 
   const handleOptionClick = (selectedIndex) => {
     const feedbackEl = document.getElementById('feedback');
-    if (!feedbackEl) return; // Null check
+    if (!feedbackEl) return; 
 
     if (selectedIndex === currentCorrectAnswerIndex) {
       feedbackEl.textContent = '✅ 答對了！非常棒！';
@@ -412,37 +420,30 @@
       feedbackEl.className = '';
     }
 
-    // 1. 生成正確答案
     const correctShape = generateRandomShape();
     
-    // 2. 繪製題目視圖
     render2DGrid('topViewGrid', getTopView(correctShape));
     render2DGrid('rightViewGrid', getRightView(correctShape));
 
-    // 3. 準備選項陣列 (1 個正確，3 個干擾)
     const options = [correctShape];
     while (options.length < 4) {
       const distractor = generateRandomShape();
-      // 簡單的查重：將陣列轉字串比較，確保不會有完全一樣的選項
       if (JSON.stringify(distractor) !== JSON.stringify(correctShape)) {
         options.push(distractor);
       }
     }
 
-    // 4. 打亂選項順序 (Fisher-Yates Shuffle)
     for (let i = options.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [options[i], options[j]] = [options[j], options[i]];
     }
 
-    // 記錄正確答案的新索引
     currentCorrectAnswerIndex = options.findIndex(
       opt => JSON.stringify(opt) === JSON.stringify(correctShape)
     );
 
-    // 5. 渲染選項與 Canvas
     const optionsContainer = document.getElementById('optionsContainer');
-    if (!optionsContainer) return; // Null check
+    if (!optionsContainer) return; 
     
     optionsContainer.innerHTML = '';
     const labels = ['(A)', '(B)', '(C)', '(D)'];
@@ -464,12 +465,10 @@
       card.appendChild(canvas);
       optionsContainer.appendChild(card);
 
-      // 畫出 3D 形狀
       renderIsometricShape(canvas, shape);
     });
   };
 
-  // 初始化第一關
   window.onload = initGame;
 
 </script>
