@@ -440,7 +440,7 @@
 
     const validStatesStr = new Set(CUBE_ROTATIONS.map(r => serializeState(getVisibleState(originalSymbols, r))));
 
-    // 4. 產生選項
+// 4. 產生選項
     let options = [];
     
     let validRots = CUBE_ROTATIONS.map(r => getVisibleState(originalSymbols, r)).filter(s => s.length > 0);
@@ -472,6 +472,26 @@
         }
       }
       
+      // ==========================================
+      // 新增：防重疊檢查機制
+      // 檢查變異後，是否有兩個以上的符號位在同一個 3D 座標點上
+      // ==========================================
+      let hasOverlap = false;
+      let posSet = new Set();
+      for (let s of mutated) {
+        // 使用四捨五入後的座標組成唯一 Key，避免浮點數誤差
+        let posKey = `${Math.round(s.p3d[0]*2)},${Math.round(s.p3d[1]*2)},${Math.round(s.p3d[2]*2)}`;
+        if (posSet.has(posKey)) {
+          hasOverlap = true;
+          break; // 發現重疊，直接中斷檢查
+        }
+        posSet.add(posKey);
+      }
+      
+      // 如果發生重疊，放棄這個結果，直接進入下一輪 while 迴圈重新產生
+      if (hasOverlap) continue;
+      // ==========================================
+
       if(!validStatesStr.has(serializeState(mutated))) {
         if(!options.some(opt => serializeState(opt) === serializeState(mutated))) {
           options.push(mutated);
@@ -481,7 +501,7 @@
 
     options.sort(() => Math.random() - 0.5);
     currentCorrectAnswerIndex = options.findIndex(opt => validStatesStr.has(serializeState(opt)));
-
+    
     // 5. 渲染 3D 方塊選項
     renderOptions(options, (ctx, visibleSyms, w, h) => {
       const oX = w/2, oY = h/2 + 20;
