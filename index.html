@@ -9,12 +9,10 @@
     --primary-color: #2c3e50;
     --border-color: #bdc3c7;
     --hover-color: #ecf0f1;
+    --accent-color: #e67e22;
   }
 
-  /* 確保所有元素的寬度包含 padding 與 border */
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
 
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -27,25 +25,24 @@
     margin: 0;
   }
 
-  header {
-    text-align: center;
-    width: 100%;
-  }
+  header { text-align: center; width: 100%; }
+  h1 { margin-bottom: 5px; }
+  .subtitle { color: #7f8c8d; margin-bottom: 20px; font-weight: bold; }
 
-  h1 { margin-bottom: 10px; }
-
-  /* 題目區域：視圖佈局 */
+  /* 動態題目區域 */
   .question-container {
     display: flex;
     gap: 40px;
-    margin-bottom: 30px;
-    padding: 20px 40px;
+    margin-bottom: 10px;
+    padding: 20px 30px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     justify-content: center;
+    align-items: center;
     width: 100%;
     max-width: 600px;
+    min-height: 200px;
   }
 
   .view-box {
@@ -54,36 +51,26 @@
     align-items: center;
   }
 
-  .view-box span {
-    margin-bottom: 8px;
-    font-weight: bold;
-  }
+  .view-box span { margin-bottom: 8px; font-weight: bold; }
 
-  /* 2D 網格繪製 */
+  /* Terrain 題型的 2D 網格 */
   .grid-2d {
     display: grid;
-    grid-template-columns: repeat(3, 30px);
-    grid-template-rows: repeat(3, 30px);
     gap: 2px;
     background-color: var(--border-color);
     border: 2px solid var(--border-color);
   }
+  .grid-cell { width: 30px; height: 30px; background-color: white; }
+  .grid-cell.filled { background-color: var(--primary-color); }
 
-  .grid-cell {
-    width: 30px;
-    height: 30px;
-    background-color: white;
-  }
-
-  .grid-cell.filled {
-    background-color: var(--primary-color);
-  }
+  /* 展開圖 Canvas */
+  #netCanvas { max-width: 100%; height: auto; }
 
   /* 選項區域 */
   .options-container {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 10px;
     width: 100%;
     max-width: 600px;
   }
@@ -98,7 +85,6 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* 確保卡片內部元素不會超出邊界 */
     overflow: hidden; 
   }
 
@@ -107,348 +93,465 @@
     border-color: #3498db;
   }
 
-  .option-label {
-    font-size: 1.2rem;
-    font-weight: bold;
-    margin-bottom: 10px;
+  .option-card.selected {
+    border-color: var(--accent-color);
+    background-color: #fff3e0;
+    box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
   }
 
-  canvas {
-    width: 200px;
-    height: 200px;
-    /* 讓 canvas 在小螢幕時能等比例縮小，不會破版 */
-    max-width: 100%; 
-  }
+  .option-label { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+  canvas { width: 200px; height: 200px; max-width: 100%; }
 
-  /* 控制與回饋區 */
-  .controls {
-    margin-top: 30px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    width: 100%;
-  }
-
+  .controls { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; }
   button {
-    padding: 12px 24px;
-    font-size: 1.1rem;
-    cursor: pointer;
-    background-color: #3498db;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-    width: 100%;
-    max-width: 300px;
+    padding: 12px 24px; font-size: 1.1rem; cursor: pointer;
+    background-color: #3498db; color: white; border: none; border-radius: 4px;
+    transition: background-color 0.2s; width: 100%; max-width: 300px; font-weight: bold;
   }
-
+  #submitBtn {
+    background-color: #27ae60;
+  }
+  #submitBtn:hover { background-color: #219150; }
   button:hover { background-color: #2980b9; }
 
-  #feedback {
-    font-size: 1.2rem;
-    font-weight: bold;
-    height: 24px;
-    text-align: center;
-  }
-
+  #feedback { font-size: 1.2rem; font-weight: bold; height: 24px; text-align: center; }
   .correct { color: #27ae60; }
   .wrong { color: #e74c3c; }
 
-  /* =========================================
-     手機版響應式設計 (RWD) 
-     當螢幕寬度小於 600px 時觸發
-     ========================================= */
   @media (max-width: 600px) {
-    body {
-      padding: 10px;
-    }
+    body { padding: 10px; }
+    .question-container { flex-direction: row; gap: 15px; padding: 8px; }
+    .options-container { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    button { padding: 15px 20px; }
+  }
 
-    .question-container {
-      flex-direction: column;
-      gap: 25px;
-      padding: 15px;
-    }
+  /* Feedback Overlay Animation */
+  .feedback-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999; /* 確保它在最上層 */
+    pointer-events: none; /* 允許點擊穿透 */
+    opacity: 0; /* 初始不可見 */
+  }
 
-    .options-container {
-      grid-template-columns: 1fr;
-      gap: 15px;
-    }
+  .feedback-overlay.show-correct {
+    background-color: rgba(39, 174, 96, 0.3); /* 綠色，帶透明度 */
+    animation: fadeOut 0.8s ease-out forwards;
+  }
 
-    button {
-      padding: 15px 20px;
-    }
+  .feedback-overlay.show-wrong {
+    background-color: rgba(231, 76, 60, 0.3); /* 紅色，帶透明度 */
+    animation: fadeOut 0.8s ease-out forwards;
+  }
+
+  @keyframes fadeOut {
+    0% { opacity: 1; } /* 修正：從 1 開始更明顯 */
+    100% { opacity: 0; } /* 完全淡出 */
   }
 </style>
 </head>
 <body>
 
+  <div id="feedbackOverlay" class="feedback-overlay"></div>
+
   <header>
-    <h1>空間關係測驗</h1>
-    <p>根據下方的「俯視圖」與「左後側視圖」，選出正確的 3D 立體圖形。</p>
+    <h1>空間邏輯測驗</h1>
+    <div id="gameSubtitle" class="subtitle"></div>
   </header>
 
   <main style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-    <section class="question-container">
-      <div class="view-box">
-        <span>俯視圖</span>
-        <div id="topViewGrid" class="grid-2d"></div>
-      </div>
-      <div class="view-box">
-        <span>左後側視圖</span>
-        <div id="rightViewGrid" class="grid-2d"></div>
-      </div>
-    </section>
-
-    <section class="options-container" id="optionsContainer">
+    <section class="question-container" id="questionArea">
       </section>
+
+    <section class="options-container" id="optionsContainer"></section>
   </main>
 
   <footer class="controls">
     <div id="feedback"></div>
-    <button id="nextBtn" onclick="initGame()">產生下一題</button>
+    <button id="submitBtn" onclick="checkAnswer()">✔️ 確認答案</button>
+    <button id="nextBtn" onclick="initGame()">🎲 產生下一題</button>
   </footer>
 
 <script>
+  let currentCorrectAnswerIndex = -1;
+  let selectedAnswerIndex = -1;
+  let currentGameType = ''; 
+
+  // ==========================================
+  // 共用：3D 二測投影基礎設定
+  // ==========================================
+  const angleX = 26 * Math.PI / 180; 
+  const angleZ = 34 * Math.PI / 180; 
+  const cubeSize = 22;
+  const dx_x = cubeSize * Math.cos(angleX);
+  const dy_x = cubeSize * Math.sin(angleX);
+  const dx_z = cubeSize * Math.cos(angleZ);
+  const dy_z = cubeSize * Math.sin(angleZ);
+  
+  const getPoint = (originX, originY, x, y, z) => ({
+    px: originX + x * dx_x - z * dx_z,
+    py: originY + x * dy_x + z * dy_z - y * cubeSize
+  });
+
+  // 映射 3D 向量到 2D Canvas 向量 (用於仿射變換矩陣)
+  const projVec = (vx, vy, vz) => ({
+    x: vx * dx_x - vz * dx_z,
+    y: vx * dy_x + vz * dy_z - vy * cubeSize
+  });
+
+  // ==========================================
+  // 模式 1：地形測驗 (Terrain)
+  // ==========================================
   const GRID_SIZE = 3;
   const MAX_HEIGHT = 3;
-  let currentCorrectAnswerIndex = -1;
 
-  // --- 1. 核心邏輯：生成與分析圖形 ---
-
-  const generateRandomShape = () => {
-    const shape = [];
-    let hasBlocks = false;
+  const initTerrainGame = () => {
+    document.getElementById('gameSubtitle').textContent = "請根據「俯視圖」與「左後側視圖」，選出正確的地形圖。";
     
-    for (let z = 0; z < GRID_SIZE; z++) {
-      const row = [];
-      for (let x = 0; x < GRID_SIZE; x++) {
-        const height = Math.random() > 0.3 ? Math.floor(Math.random() * (MAX_HEIGHT + 1)) : 0;
-        row.push(height);
-        if (height > 0) hasBlocks = true;
-      }
-      shape.push(row);
-    }
-    
-    return hasBlocks ? shape : generateRandomShape();
-  };
+    const qArea = document.getElementById('questionArea');
+    if (!qArea) return;
 
-  const getTopView = (shape) => {
-    const view = [];
-    for (let z = 0; z < GRID_SIZE; z++) {
-      const row = [];
-      for (let x = 0; x < GRID_SIZE; x++) {
-        row.push(shape[z][x] > 0 ? 1 : 0);
-      }
-      view.push(row);
-    }
-    return view;
-  };
+    qArea.innerHTML = `
+      <div class="view-box"><span>俯視圖</span><div id="topViewGrid" class="grid-2d"></div></div>
+      <div class="view-box"><span>左後側視圖</span><div id="rightViewGrid" class="grid-2d"></div></div>
+    `;
 
-  const getRightView = (shape) => {
-    const view = Array(MAX_HEIGHT).fill(0).map(() => Array(GRID_SIZE).fill(0));
-    
-    for (let z = 0; z < GRID_SIZE; z++) {
-      let maxHeightInRow = 0;
-      for (let x = 0; x < GRID_SIZE; x++) {
-        if (shape[z][x] > maxHeightInRow) {
-          maxHeightInRow = shape[z][x];
+    const generateShape = () => {
+      let shape = [], hasBlocks = false;
+      for (let z=0; z<GRID_SIZE; z++) {
+        let row = [];
+        for (let x=0; x<GRID_SIZE; x++) {
+          let h = Math.random() > 0.3 ? Math.floor(Math.random() * (MAX_HEIGHT + 1)) : 0;
+          row.push(h);
+          if (h > 0) hasBlocks = true;
         }
+        shape.push(row);
       }
-      for (let y = 0; y < maxHeightInRow; y++) {
-        view[(MAX_HEIGHT - 1) - y][z] = 1; 
-      }
-    }
-    return view;
-  };
-
-  // --- 2. 視圖渲染 (DOM 操作) ---
-
-  const render2DGrid = (elementId, viewMatrix) => {
-    const container = document.getElementById(elementId);
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    const rows = viewMatrix.length;
-    const cols = viewMatrix[0].length;
-    container.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
-    container.style.gridTemplateRows = `repeat(${rows}, 30px)`;
-
-    for (let i = 0; i < rows; i++) {
-      for (let j = 0; j < cols; j++) {
-        const cell = document.createElement('div');
-        cell.className = 'grid-cell' + (viewMatrix[i][j] ? ' filled' : '');
-        container.appendChild(cell);
-      }
-    }
-  };
-
-  // --- 3. Isometric (等角投影) Canvas 實心實體繪製核心 ---
-
-  const renderIsometricShape = (canvasElement, shape) => {
-    if (!canvasElement) return;
-    
-    const ctx = canvasElement.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvasElement.width;
-    const height = canvasElement.height;
-    
-    ctx.clearRect(0, 0, width, height);
-    
-    const cubeSize = 22; 
-    const dx = cubeSize * Math.cos(Math.PI / 6);
-    const dy = cubeSize * Math.sin(Math.PI / 6);
-    
-    const originX = width / 2;
-    const originY = height / 2 + 2; 
-
-    // ==========================================
-    // 新增：繪製底層九宮格虛線
-    // ==========================================
-    ctx.save();
-    ctx.setLineDash([4, 4]); // 設定為虛線 (長度4, 間距4)
-    ctx.strokeStyle = '#bdc3c7'; // 虛線顏色使用淺灰色
-    ctx.lineWidth = 1;
-
-    /**
-     * 輔助函數：計算 3D 空間中 (x, z) 座標落在 2D 畫布上的點
-     * 這個公式對應於方塊(y=0)時，貼齊地面的最深處(後角)頂點
-     */
-    const getFloorPoint = (gridX, gridZ) => {
-      return {
-        px: originX + (gridX - gridZ) * dx,
-        // - 2 * dy 是為了推算到正方形背後的頂點，+ cubeSize 是降到底部高度
-        py: originY + (gridX + gridZ - 2) * dy + cubeSize 
-      };
+      return hasBlocks ? shape : generateShape();
     };
 
-    // 畫 4 條平行的 Z 軸方向底線
-    for (let x = 0; x <= GRID_SIZE; x++) {
-      ctx.beginPath();
-      const start = getFloorPoint(x, 0);
-      const end = getFloorPoint(x, GRID_SIZE);
-      ctx.moveTo(start.px, start.py);
-      ctx.lineTo(end.px, end.py);
-      ctx.stroke();
-    }
+    const getViews = (s) => {
+      let top = [], right = Array(MAX_HEIGHT).fill(0).map(()=>Array(GRID_SIZE).fill(0));
+      for (let z=0; z<GRID_SIZE; z++) {
+        let row = [], maxH = 0;
+        for (let x=0; x<GRID_SIZE; x++) {
+          row.push(s[z][x] > 0 ? 1 : 0);
+          if (s[z][x] > maxH) maxH = s[z][x];
+        }
+        top.push(row);
+        for (let y=0; y<maxH; y++) right[(MAX_HEIGHT-1)-y][z] = 1; 
+      }
+      return { top, right };
+    };
 
-    // 畫 4 條平行的 X 軸方向底線
-    for (let z = 0; z <= GRID_SIZE; z++) {
-      ctx.beginPath();
-      const start = getFloorPoint(0, z);
-      const end = getFloorPoint(GRID_SIZE, z);
-      ctx.moveTo(start.px, start.py);
-      ctx.lineTo(end.px, end.py);
-      ctx.stroke();
-    }
-    ctx.restore(); // 恢復畫筆狀態，確保後續的方塊框線不會變成虛線
-    // ==========================================
+    const correctShape = generateShape();
+    const views = getViews(correctShape);
+    
+    const renderGrid = (id, matrix) => {
+      const c = document.getElementById(id);
+      if (!c) return;
+      c.style.gridTemplateColumns = `repeat(${matrix[0].length}, 30px)`;
+      c.style.gridTemplateRows = `repeat(${matrix.length}, 30px)`;
+      c.innerHTML = '';
+      matrix.forEach(row => row.forEach(val => {
+        let div = document.createElement('div');
+        div.className = 'grid-cell' + (val ? ' filled' : '');
+        c.appendChild(div);
+      }));
+    };
+    renderGrid('topViewGrid', views.top);
+    renderGrid('rightViewGrid', views.right);
 
-    const drawSolidCube = (x, y, z) => {
-      const screenX = originX + (x - z) * dx;
-      const screenY = originY - (y * cubeSize) + (x + z) * dy;
+    let options = [correctShape];
+    while(options.length < 4) {
+      let d = generateShape();
+      if(JSON.stringify(d) !== JSON.stringify(correctShape)) options.push(d);
+    }
+    options.sort(() => Math.random() - 0.5);
+    currentCorrectAnswerIndex = options.findIndex(opt => JSON.stringify(opt) === JSON.stringify(correctShape));
+
+    renderOptions(options, (ctx, shape, w, h) => {
+      const oX = w/2, oY = h/2 - 5;
       
-      // Left Face
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY);
-      ctx.lineTo(screenX - dx, screenY - dy);
-      ctx.lineTo(screenX - dx, screenY - dy + cubeSize);
-      ctx.lineTo(screenX, screenY + cubeSize);
-      ctx.closePath();
-      ctx.fillStyle = '#7f8c8d'; 
-      ctx.fill();
+      ctx.save(); ctx.setLineDash([4,4]); ctx.strokeStyle='#bdc3c7'; ctx.lineWidth=1;
+      for(let i=0; i<=GRID_SIZE; i++) {
+        ctx.beginPath();
+        let p1 = getPoint(oX, oY, i, 0, 0), p2 = getPoint(oX, oY, i, 0, GRID_SIZE);
+        ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
+        let p3 = getPoint(oX, oY, 0, 0, i), p4 = getPoint(oX, oY, GRID_SIZE, 0, i);
+        ctx.moveTo(p3.px, p3.py); ctx.lineTo(p4.px, p4.py); ctx.stroke();
+      }
+      ctx.restore();
 
-      // Right Face
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY);
-      ctx.lineTo(screenX + dx, screenY - dy);
-      ctx.lineTo(screenX + dx, screenY - dy + cubeSize);
-      ctx.lineTo(screenX, screenY + cubeSize);
-      ctx.closePath();
-      ctx.fillStyle = '#bdc3c7'; 
-      ctx.fill();
+      const drawCube = (x,y,z) => {
+        let p;
+        ctx.beginPath(); p=getPoint(oX,oY,x,y,z+1); ctx.moveTo(p.px,p.py); p=getPoint(oX,oY,x,y+1,z+1); ctx.lineTo(p.px,p.py); p=getPoint(oX,oY,x+1,y+1,z+1); ctx.lineTo(p.px,p.py); p=getPoint(oX,oY,x+1,y,z+1); ctx.lineTo(p.px,p.py); ctx.closePath();
+        ctx.fillStyle='#7f8c8d'; ctx.fill(); ctx.strokeStyle='#95a5a6'; ctx.stroke();
+        ctx.beginPath(); p=getPoint(oX,oY,x+1,y,z+1); ctx.moveTo(p.px,p.py); p=getPoint(oX,oY,x+1,y+1,z+1); ctx.lineTo(p.px,p.py); p=getPoint(oX,oY,x+1,y+1,z); ctx.lineTo(p.px,p.py); p=getPoint(oX,oY,x+1,y,z); ctx.lineTo(p.px,p.py); ctx.closePath();
+        ctx.fillStyle='#bdc3c7'; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); p=getPoint(oX,oY,x,y+1,z+1); ctx.moveTo(p.px,p.py); p=getPoint(oX,oY,x+1,y+1,z+1); ctx.lineTo(p.px,p.py); p=getPoint(oX,oY,x+1,y+1,z); ctx.lineTo(p.px,p.py); p=getPoint(oX,oY,x,y+1,z); ctx.lineTo(p.px,p.py); ctx.closePath();
+        ctx.fillStyle='#fbfcfc'; ctx.fill(); ctx.stroke();
+      };
 
-      // Top Face
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY);
-      ctx.lineTo(screenX + dx, screenY - dy);
-      ctx.lineTo(screenX, screenY - 2 * dy);
-      ctx.lineTo(screenX - dx, screenY - dy);
-      ctx.closePath();
-      ctx.fillStyle = '#fbfcfc'; 
-      ctx.fill();
-
-      // Edges
-      ctx.strokeStyle = '#95a5a6';
-      ctx.lineWidth = 0.8;
-      ctx.stroke(); 
-    };
-
-    for (let y = 0; y < MAX_HEIGHT; y++) {
-      for (let depthSum = 0; depthSum <= 2 * (GRID_SIZE - 1); depthSum++) {
-        for (let x = 0; x < GRID_SIZE; x++) {
-          const z = depthSum - x;
-          if (z >= 0 && z < GRID_SIZE && shape[z][x] > y) {
-            drawSolidCube(x, y, z);
+      for(let y=0; y<MAX_HEIGHT; y++) {
+        for(let ds=0; ds<=2*(GRID_SIZE-1); ds++) {
+          for(let x=0; x<GRID_SIZE; x++) {
+            let z = ds-x;
+            if(z>=0 && z<GRID_SIZE && shape[z][x]>y) drawCube(x,y,z);
           }
         }
       }
-    }
+    });
   };
 
-  // --- 4. 遊戲主邏輯 ---
+  // ==========================================
+  // 模式 2：展開圖折疊測驗 (Cube Folding)
+  // ==========================================
+  const FACES = [
+    { id:'F', n:[0,0,1],  r:[1,0,0], d:[0,-1,0], net:[1,1] },
+    { id:'B', n:[0,0,-1], r:[-1,0,0],d:[0,-1,0], net:[3,1] },
+    { id:'U', n:[0,1,0],  r:[1,0,0], d:[0,0,1],  net:[1,0] },
+    { id:'D', n:[0,-1,0], r:[1,0,0], d:[0,0,-1], net:[1,2] },
+    { id:'R', n:[1,0,0],  r:[0,0,-1],d:[0,-1,0], net:[2,1] },
+    { id:'L', n:[-1,0,0], r:[0,0,1], d:[0,-1,0], net:[0,1] }
+  ];
 
-  const handleOptionClick = (selectedIndex) => {
-    const feedbackEl = document.getElementById('feedback');
-    if (!feedbackEl) return; 
+  const _dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+  const _dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const _cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const CUBE_ROTATIONS = [];
+  _dirs.forEach(vf => {
+    _dirs.forEach(vu => {
+      if(_dot(vf,vu) === 0) CUBE_ROTATIONS.push({vr: _cross(vu,vf), vu, vf});
+    });
+  });
 
-    if (selectedIndex === currentCorrectAnswerIndex) {
-      feedbackEl.textContent = '✅ 答對了！非常棒！';
-      feedbackEl.className = 'correct';
-    } else {
-      feedbackEl.textContent = '❌ 答錯了，再仔細觀察一下視圖喔！';
-      feedbackEl.className = 'wrong';
-    }
-  };
+  // 3D 旋轉矩陣運算
+  const applyRot = (v, rot) => [
+      v[0]*rot.vr[0] + v[1]*rot.vu[0] + v[2]*rot.vf[0],
+      v[0]*rot.vr[1] + v[1]*rot.vu[1] + v[2]*rot.vf[1],
+      v[0]*rot.vr[2] + v[1]*rot.vu[2] + v[2]*rot.vf[2]
+  ];
 
-  const initGame = () => {
-    const feedbackEl = document.getElementById('feedback');
-    if (feedbackEl) {
-      feedbackEl.textContent = '';
-      feedbackEl.className = '';
-    }
-
-    const correctShape = generateRandomShape();
+  const initCubeFoldingGame = () => {
+    document.getElementById('gameSubtitle').textContent = "左側是方塊的展開圖，請選出折疊後「不可能」出現錯誤的正確立體圖形。";
     
-    render2DGrid('topViewGrid', getTopView(correctShape));
-    render2DGrid('rightViewGrid', getRightView(correctShape));
+    const qArea = document.getElementById('questionArea');
+    if (!qArea) return;
+    qArea.innerHTML = `<canvas id="netCanvas" width="240" height="180"></canvas>`;
+    
+    // 1. 生成原始符號
+    const totalSyms = Math.floor(Math.random()*3)+2;
+    let cells = [];
+    FACES.forEach(f => [-0.5, 0.5].forEach(cx => [-0.5, 0.5].forEach(cy => cells.push({f, cx, cy}))));
+    cells.sort(()=>Math.random()-0.5);
+    
+    const originalSymbols = cells.slice(0, totalSyms).map(c => {
+      return {
+        ...c,
+        type: Math.floor(Math.random()*4),
+        p3d: [
+          c.f.n[0] + c.cx*c.f.r[0] + c.cy*c.f.d[0],
+          c.f.n[1] + c.cx*c.f.r[1] + c.cy*c.f.d[1],
+          c.f.n[2] + c.cx*c.f.r[2] + c.cy*c.f.d[2]
+        ]
+      };
+    });
 
-    const options = [correctShape];
-    while (options.length < 4) {
-      const distractor = generateRandomShape();
-      if (JSON.stringify(distractor) !== JSON.stringify(correctShape)) {
-        options.push(distractor);
+    // 2. 繪製精準的 2D 展開圖 (修復置中問題)
+    const netCtx = document.getElementById('netCanvas').getContext('2d');
+    const FACE_SZ = 40;
+    const offsetX = 40, offsetY = 10;
+    
+    netCtx.strokeStyle = '#34495e'; netCtx.lineWidth = 2;
+    FACES.forEach(f => {
+      let x = offsetX + f.net[0]*FACE_SZ, y = offsetY + f.net[1]*FACE_SZ;
+      netCtx.strokeRect(x, y, FACE_SZ, FACE_SZ);
+      netCtx.beginPath();
+      netCtx.moveTo(x+FACE_SZ/2, y); netCtx.lineTo(x+FACE_SZ/2, y+FACE_SZ);
+      netCtx.moveTo(x, y+FACE_SZ/2); netCtx.lineTo(x+FACE_SZ, y+FACE_SZ/2);
+      netCtx.lineWidth = 1; netCtx.stroke(); netCtx.lineWidth = 2;
+    });
+
+    originalSymbols.forEach(s => {
+      let bx = offsetX + s.f.net[0]*FACE_SZ;
+      let by = offsetY + s.f.net[1]*FACE_SZ;
+      // 修正偏移：精準映射至 2x2 子方格中心
+      let px = bx + FACE_SZ/2 + s.cx * (FACE_SZ/2); 
+      let py = by + FACE_SZ/2 + s.cy * (FACE_SZ/2);
+      
+      netCtx.save();
+      netCtx.translate(px, py);
+      netCtx.scale(FACE_SZ/2, FACE_SZ/2); // 縮放基底 1 單位
+      
+      netCtx.lineWidth = 2 / (FACE_SZ/2); 
+      netCtx.strokeStyle = '#2c3e50';
+      netCtx.fillStyle = '#34495e';
+      netCtx.beginPath();
+      netCtx.lineJoin = 'round'; netCtx.lineCap = 'round';
+      
+      // 畫圖形基礎路徑
+      if(s.type === 0) {
+        netCtx.arc(0,0, 0.4, 0, Math.PI*2); netCtx.stroke();
+      } else if(s.type === 1) {
+        netCtx.moveTo(0, -0.4); netCtx.lineTo(0.4, 0.4); netCtx.lineTo(-0.4, 0.4); netCtx.closePath(); netCtx.stroke();
+      } else if(s.type === 2) {
+        netCtx.fillRect(-0.35, -0.35, 0.7, 0.7);
+      } else if(s.type === 3) {
+        let sz = 0.35;
+        netCtx.moveTo(-sz,-sz); netCtx.lineTo(sz,sz); netCtx.moveTo(sz,-sz); netCtx.lineTo(-sz,sz); netCtx.stroke();
+      }
+      netCtx.restore();
+    });
+
+    // 3. 核心工具：取得旋轉後的可視狀態
+    const getVisibleState = (symbols, rot) => {
+      let visible = [];
+      symbols.forEach(s => {
+        let p_rot = applyRot(s.p3d, rot);
+        // 若在相機的 Top, Right, Front 面上
+        if(p_rot[0] > 0.9 || p_rot[1] > 0.9 || p_rot[2] > 0.9) {
+          visible.push({
+            p3d: p_rot, 
+            r_rot: applyRot(s.f.r, rot), // 記錄旋轉後的 X 軸
+            d_rot: applyRot(s.f.d, rot), // 記錄旋轉後的 Y 軸
+            type: s.type
+          });
+        }
+      });
+      return visible;
+    };
+
+    // 嚴謹的序列化：包含三角形的指向，確保方向錯誤的干擾選項能被正確識別
+    const serializeSym = (s) => {
+        let str = `${Math.round(s.p3d[0]*2)},${Math.round(s.p3d[1]*2)},${Math.round(s.p3d[2]*2)},${s.type}`;
+        if (s.type === 1) { // 只有三角形等不對稱圖形需要記錄指向
+            str += `,${Math.round(s.d_rot[0])},${Math.round(s.d_rot[1])},${Math.round(s.d_rot[2])}`;
+        }
+        return str;
+    };
+    const serializeState = (state) => state.map(serializeSym).sort().join('|');
+
+    const validStatesStr = new Set(CUBE_ROTATIONS.map(r => serializeState(getVisibleState(originalSymbols, r))));
+
+    // 4. 產生選項
+    let options = [];
+    
+    let validRots = CUBE_ROTATIONS.map(r => getVisibleState(originalSymbols, r)).filter(s => s.length > 0);
+    if(validRots.length === 0) validRots = [getVisibleState(originalSymbols, CUBE_ROTATIONS[0])];
+    options.push(validRots[Math.floor(Math.random()*validRots.length)]);
+
+    while(options.length < 4) {
+      let baseState = validRots[Math.floor(Math.random()*validRots.length)];
+      let mutated = JSON.parse(JSON.stringify(baseState));
+      
+      if(mutated.length === 0) {
+        mutated.push({p3d: [1, 0.5, 0.5], r_rot:[0,1,0], d_rot:[0,0,1], type: 0}); 
+      } else {
+        let target = mutated[Math.floor(Math.random()*mutated.length)];
+        let mutationType = Math.floor(Math.random() * 3);
+        
+        if (mutationType === 0) {
+            target.type = (target.type + 1) % 4; // 變換形狀
+        } else if (mutationType === 1) {
+            // 在該面上隨機換到隔壁的格子
+            for (let i=0; i<3; i++) {
+                if (Math.abs(target.p3d[i]) < 0.9) {
+                    target.p3d[i] *= -1; 
+                    break; 
+                }
+            }
+        } else {
+            // 把圖形反轉 (針對三角形)
+            target.d_rot = [-target.d_rot[0], -target.d_rot[1], -target.d_rot[2]];
+            target.r_rot = [-target.r_rot[0], -target.r_rot[1], -target.r_rot[2]];
+        }
+      }
+      
+      if(!validStatesStr.has(serializeState(mutated))) {
+        if(!options.some(opt => serializeState(opt) === serializeState(mutated))) {
+          options.push(mutated);
+        }
       }
     }
 
-    for (let i = options.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [options[i], options[j]] = [options[j], options[i]];
-    }
+    options.sort(() => Math.random() - 0.5);
+    currentCorrectAnswerIndex = options.findIndex(opt => validStatesStr.has(serializeState(opt)));
 
-    currentCorrectAnswerIndex = options.findIndex(
-      opt => JSON.stringify(opt) === JSON.stringify(correctShape)
-    );
+    // 5. 渲染 3D 方塊選項 (加入 Affine 貼合變換)
+    renderOptions(options, (ctx, visibleSyms, w, h) => {
+      const oX = w/2, oY = h/2 + 20;
+      
+      const drawFace = (c1,c2,c3,c4, color) => {
+        ctx.beginPath(); ctx.moveTo(c1.px,c1.py); ctx.lineTo(c2.px,c2.py); ctx.lineTo(c3.px,c3.py); ctx.lineTo(c4.px,c4.py); ctx.closePath();
+        ctx.fillStyle=color; ctx.fill(); ctx.strokeStyle='#7f8c8d'; ctx.lineWidth=1.5; ctx.stroke();
+      };
+      
+      let p_fff = getPoint(oX,oY, 1,1,1), p_nff = getPoint(oX,oY, -1,1,1), p_nnf = getPoint(oX,oY, -1,-1,1), p_fnf = getPoint(oX,oY, 1,-1,1);
+      let p_ffn = getPoint(oX,oY, 1,1,-1), p_nfn = getPoint(oX,oY, -1,1,-1);
+      
+      drawFace(p_fff, p_nff, p_nnf, p_fnf, '#ecf0f1'); // F 面
+      drawFace(p_fff, p_fnf, getPoint(oX,oY,1,-1,-1), p_ffn, '#bdc3c7'); // R 面
+      drawFace(p_fff, p_ffn, p_nfn, p_nff, '#ffffff'); // U 面
 
-    const optionsContainer = document.getElementById('optionsContainer');
-    if (!optionsContainer) return; 
-    
-    optionsContainer.innerHTML = '';
+      ctx.beginPath(); ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.lineWidth=1;
+      let tm; 
+      tm=getPoint(oX,oY,0,1,1); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,0,-1,1); ctx.lineTo(tm.px,tm.py);
+      tm=getPoint(oX,oY,1,0,1); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,-1,0,1); ctx.lineTo(tm.px,tm.py);
+      tm=getPoint(oX,oY,1,1,0); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,1,-1,0); ctx.lineTo(tm.px,tm.py);
+      tm=getPoint(oX,oY,1,0,1); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,1,0,-1); ctx.lineTo(tm.px,tm.py);
+      tm=getPoint(oX,oY,1,1,0); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,-1,1,0); ctx.lineTo(tm.px,tm.py);
+      tm=getPoint(oX,oY,0,1,1); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,0,1,-1); ctx.lineTo(tm.px,tm.py);
+      ctx.stroke();
+
+      // ==========================================
+      // 透視貼合繪製核心：利用 ctx.transform 變形矩陣
+      // ==========================================
+      visibleSyms.forEach(sym => {
+        let center = getPoint(oX, oY, sym.p3d[0], sym.p3d[1], sym.p3d[2]);
+        let uVec = projVec(sym.r_rot[0], sym.r_rot[1], sym.r_rot[2]);
+        let vVec = projVec(sym.d_rot[0], sym.d_rot[1], sym.d_rot[2]);
+
+        ctx.save();
+        // 賦予 2D 畫布該平面的 3D 透視屬性
+        ctx.transform(uVec.x, uVec.y, vVec.x, vVec.y, center.px, center.py);
+        
+        // 此時，我們只要畫純平面的 2D 圖形，它自然就會貼在立體面上！
+        ctx.lineWidth = 2 / cubeSize; // 根據縮放比例還原線條粗細
+        ctx.strokeStyle = '#2c3e50';
+        ctx.fillStyle = '#34495e';
+        ctx.beginPath();
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        
+        if(sym.type === 0) {
+            ctx.arc(0,0, 0.4, 0, Math.PI*2); ctx.stroke();
+        } else if(sym.type === 1) {
+            ctx.moveTo(0, -0.4); ctx.lineTo(0.4, 0.4); ctx.lineTo(-0.4, 0.4); ctx.closePath(); ctx.stroke();
+        } else if(sym.type === 2) {
+            ctx.fillRect(-0.35, -0.35, 0.7, 0.7);
+        } else if(sym.type === 3) {
+            let sz = 0.35;
+            ctx.moveTo(-sz,-sz); ctx.lineTo(sz,sz); ctx.moveTo(sz,-sz); ctx.lineTo(-sz,sz); ctx.stroke();
+        }
+        ctx.restore();
+      });
+    });
+  };
+
+  // ==========================================
+  // 共用：選項渲染與流程控制
+  // ==========================================
+  const renderOptions = (optionsData, drawCallback) => {
+    const container = document.getElementById('optionsContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
     const labels = ['(A)', '(B)', '(C)', '(D)'];
 
-    options.forEach((shape, index) => {
+    optionsData.forEach((data, index) => {
       const card = document.createElement('div');
       card.className = 'option-card';
       card.onclick = () => handleOptionClick(index);
@@ -458,17 +561,68 @@
       label.textContent = labels[index];
 
       const canvas = document.createElement('canvas');
-      canvas.width = 200;
-      canvas.height = 200;
+      canvas.width = 200; canvas.height = 200;
 
       card.appendChild(label);
       card.appendChild(canvas);
-      optionsContainer.appendChild(card);
+      container.appendChild(card);
 
-      renderIsometricShape(canvas, shape);
+      drawCallback(canvas.getContext('2d'), data, canvas.width, canvas.height);
     });
   };
 
+  const handleOptionClick = (selectedIndex) => {
+    selectedAnswerIndex = selectedIndex;
+    // 更新視覺選取狀態
+    const cards = document.querySelectorAll('.option-card');
+    cards.forEach((card, i) => {
+      if (i === selectedIndex) card.classList.add('selected');
+      else card.classList.remove('selected');
+    });
+    // 清除先前的回饋文字
+    const feedbackEl = document.getElementById('feedback');
+    if (feedbackEl) feedbackEl.textContent = '';
+  };
+
+  const checkAnswer = () => {
+    if (selectedAnswerIndex === -1) {
+      alert('請先選擇一個選項！');
+      return;
+    }
+    const feedbackEl = document.getElementById('feedback');
+    const overlayEl = document.getElementById('feedbackOverlay');
+    
+    if (!feedbackEl || !overlayEl) return; // 嚴謹 null check
+
+    // 重置動畫 class，並強制觸發 Reflow，讓動畫可以重複播放
+    overlayEl.classList.remove('show-correct', 'show-wrong');
+    void overlayEl.offsetWidth; // 關鍵！強制瀏覽器重新繪製
+
+    const labels = ['A', 'B', 'C', 'D'];
+    if (selectedAnswerIndex === currentCorrectAnswerIndex) {
+      feedbackEl.textContent = '真棒';
+      feedbackEl.className = 'correct';
+      overlayEl.classList.add('show-correct'); // 觸發綠色動畫
+    } else {
+      feedbackEl.textContent = `答案錯誤，正確答案為 "${labels[currentCorrectAnswerIndex]}"`;
+      feedbackEl.className = 'wrong';
+      overlayEl.classList.add('show-wrong'); // 觸發紅色動畫
+    }
+  };
+
+  const initGame = () => {
+    selectedAnswerIndex = -1;
+    const feedbackEl = document.getElementById('feedback');
+    if (feedbackEl) {
+      feedbackEl.textContent = '';
+      feedbackEl.className = '';
+    }
+    // 隨機決定模式 (50% 機率)
+    if(Math.random() < 0.5) initTerrainGame();
+    else initCubeFoldingGame();
+  };
+
+  // 初始啟動
   window.onload = initGame;
 
 </script>
