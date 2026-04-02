@@ -26,7 +26,7 @@
   }
 
   header { text-align: center; width: 100%; }
-  h1 { margin-bottom: 5px; }
+  h1 { margin-bottom: 2px; }
   .subtitle { color: #7f8c8d; margin-bottom: 20px; font-weight: bold; }
 
   /* 動態題目區域 */
@@ -34,7 +34,7 @@
     display: flex;
     gap: 40px;
     margin-bottom: 10px;
-    padding: 20px 30px;
+    padding: 20px 40px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -99,8 +99,15 @@
     box-shadow: 0 0 10px rgba(230, 126, 34, 0.5);
   }
 
-  .option-label { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
-  canvas { width: 200px; height: 200px; max-width: 100%; }
+  .option-label { font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; }
+
+  /* 修正這裡：讓 canvas 等比例縮放，避免手機版變形 */
+  canvas { 
+    width: 200px; 
+    height: auto; 
+    aspect-ratio: 1 / 1; 
+    max-width: 100%; 
+  }
 
   .controls { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; }
   button {
@@ -148,7 +155,7 @@
   }
 
   @keyframes fadeOut {
-    0% { opacity: 1; } /* 修正：從 1 開始更明顯 */
+    0% { opacity: 1; } /* 從完全不透明開始 */
     100% { opacity: 0; } /* 完全淡出 */
   }
 </style>
@@ -361,7 +368,7 @@
       };
     });
 
-    // 2. 繪製精準的 2D 展開圖 (修復置中問題)
+    // 2. 繪製精準的 2D 展開圖
     const netCtx = document.getElementById('netCanvas').getContext('2d');
     const FACE_SZ = 40;
     const offsetX = 40, offsetY = 10;
@@ -379,13 +386,12 @@
     originalSymbols.forEach(s => {
       let bx = offsetX + s.f.net[0]*FACE_SZ;
       let by = offsetY + s.f.net[1]*FACE_SZ;
-      // 修正偏移：精準映射至 2x2 子方格中心
       let px = bx + FACE_SZ/2 + s.cx * (FACE_SZ/2); 
       let py = by + FACE_SZ/2 + s.cy * (FACE_SZ/2);
       
       netCtx.save();
       netCtx.translate(px, py);
-      netCtx.scale(FACE_SZ/2, FACE_SZ/2); // 縮放基底 1 單位
+      netCtx.scale(FACE_SZ/2, FACE_SZ/2); 
       
       netCtx.lineWidth = 2 / (FACE_SZ/2); 
       netCtx.strokeStyle = '#2c3e50';
@@ -393,7 +399,6 @@
       netCtx.beginPath();
       netCtx.lineJoin = 'round'; netCtx.lineCap = 'round';
       
-      // 畫圖形基礎路徑
       if(s.type === 0) {
         netCtx.arc(0,0, 0.4, 0, Math.PI*2); netCtx.stroke();
       } else if(s.type === 1) {
@@ -412,12 +417,11 @@
       let visible = [];
       symbols.forEach(s => {
         let p_rot = applyRot(s.p3d, rot);
-        // 若在相機的 Top, Right, Front 面上
         if(p_rot[0] > 0.9 || p_rot[1] > 0.9 || p_rot[2] > 0.9) {
           visible.push({
             p3d: p_rot, 
-            r_rot: applyRot(s.f.r, rot), // 記錄旋轉後的 X 軸
-            d_rot: applyRot(s.f.d, rot), // 記錄旋轉後的 Y 軸
+            r_rot: applyRot(s.f.r, rot), 
+            d_rot: applyRot(s.f.d, rot), 
             type: s.type
           });
         }
@@ -425,10 +429,9 @@
       return visible;
     };
 
-    // 嚴謹的序列化：包含三角形的指向，確保方向錯誤的干擾選項能被正確識別
     const serializeSym = (s) => {
         let str = `${Math.round(s.p3d[0]*2)},${Math.round(s.p3d[1]*2)},${Math.round(s.p3d[2]*2)},${s.type}`;
-        if (s.type === 1) { // 只有三角形等不對稱圖形需要記錄指向
+        if (s.type === 1) { 
             str += `,${Math.round(s.d_rot[0])},${Math.round(s.d_rot[1])},${Math.round(s.d_rot[2])}`;
         }
         return str;
@@ -455,9 +458,8 @@
         let mutationType = Math.floor(Math.random() * 3);
         
         if (mutationType === 0) {
-            target.type = (target.type + 1) % 4; // 變換形狀
+            target.type = (target.type + 1) % 4; 
         } else if (mutationType === 1) {
-            // 在該面上隨機換到隔壁的格子
             for (let i=0; i<3; i++) {
                 if (Math.abs(target.p3d[i]) < 0.9) {
                     target.p3d[i] *= -1; 
@@ -465,7 +467,6 @@
                 }
             }
         } else {
-            // 把圖形反轉 (針對三角形)
             target.d_rot = [-target.d_rot[0], -target.d_rot[1], -target.d_rot[2]];
             target.r_rot = [-target.r_rot[0], -target.r_rot[1], -target.r_rot[2]];
         }
@@ -481,7 +482,7 @@
     options.sort(() => Math.random() - 0.5);
     currentCorrectAnswerIndex = options.findIndex(opt => validStatesStr.has(serializeState(opt)));
 
-    // 5. 渲染 3D 方塊選項 (加入 Affine 貼合變換)
+    // 5. 渲染 3D 方塊選項
     renderOptions(options, (ctx, visibleSyms, w, h) => {
       const oX = w/2, oY = h/2 + 20;
       
@@ -507,20 +508,15 @@
       tm=getPoint(oX,oY,0,1,1); ctx.moveTo(tm.px,tm.py); tm=getPoint(oX,oY,0,1,-1); ctx.lineTo(tm.px,tm.py);
       ctx.stroke();
 
-      // ==========================================
-      // 透視貼合繪製核心：利用 ctx.transform 變形矩陣
-      // ==========================================
       visibleSyms.forEach(sym => {
         let center = getPoint(oX, oY, sym.p3d[0], sym.p3d[1], sym.p3d[2]);
         let uVec = projVec(sym.r_rot[0], sym.r_rot[1], sym.r_rot[2]);
         let vVec = projVec(sym.d_rot[0], sym.d_rot[1], sym.d_rot[2]);
 
         ctx.save();
-        // 賦予 2D 畫布該平面的 3D 透視屬性
         ctx.transform(uVec.x, uVec.y, vVec.x, vVec.y, center.px, center.py);
         
-        // 此時，我們只要畫純平面的 2D 圖形，它自然就會貼在立體面上！
-        ctx.lineWidth = 2 / cubeSize; // 根據縮放比例還原線條粗細
+        ctx.lineWidth = 2 / cubeSize; 
         ctx.strokeStyle = '#2c3e50';
         ctx.fillStyle = '#34495e';
         ctx.beginPath();
@@ -573,13 +569,11 @@
 
   const handleOptionClick = (selectedIndex) => {
     selectedAnswerIndex = selectedIndex;
-    // 更新視覺選取狀態
     const cards = document.querySelectorAll('.option-card');
     cards.forEach((card, i) => {
       if (i === selectedIndex) card.classList.add('selected');
       else card.classList.remove('selected');
     });
-    // 清除先前的回饋文字
     const feedbackEl = document.getElementById('feedback');
     if (feedbackEl) feedbackEl.textContent = '';
   };
@@ -592,7 +586,7 @@
     const feedbackEl = document.getElementById('feedback');
     const overlayEl = document.getElementById('feedbackOverlay');
     
-    if (!feedbackEl || !overlayEl) return; // 嚴謹 null check
+    if (!feedbackEl || !overlayEl) return; 
 
     // 重置動畫 class，並強制觸發 Reflow，讓動畫可以重複播放
     overlayEl.classList.remove('show-correct', 'show-wrong');
@@ -602,11 +596,11 @@
     if (selectedAnswerIndex === currentCorrectAnswerIndex) {
       feedbackEl.textContent = '真棒';
       feedbackEl.className = 'correct';
-      overlayEl.classList.add('show-correct'); // 觸發綠色動畫
+      overlayEl.classList.add('show-correct'); 
     } else {
       feedbackEl.textContent = `答案錯誤，正確答案為 "${labels[currentCorrectAnswerIndex]}"`;
       feedbackEl.className = 'wrong';
-      overlayEl.classList.add('show-wrong'); // 觸發紅色動畫
+      overlayEl.classList.add('show-wrong'); 
     }
   };
 
@@ -617,12 +611,10 @@
       feedbackEl.textContent = '';
       feedbackEl.className = '';
     }
-    // 隨機決定模式 (50% 機率)
     if(Math.random() < 0.5) initTerrainGame();
     else initCubeFoldingGame();
   };
 
-  // 初始啟動
   window.onload = initGame;
 
 </script>
